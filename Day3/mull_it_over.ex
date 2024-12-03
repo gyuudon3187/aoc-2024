@@ -45,11 +45,9 @@ defmodule MullItOver do
             not Regex.match?(~r/^mul\(\d{1,3}$/, head) ->
               {[], ""}
 
-            tail != [] and tail != [""] and byte != ")" and
-                not Regex.match?(~r/^\d{1,3}$/, hd(tail)) ->
-              {[], ""}
-
-            tail != [] and tail != [""] and length(tail) != 1 ->
+            tail != [] and tail != [""] and
+                ((byte != ")" and
+                    not Regex.match?(~r/^\d{1,3}$/, hd(tail))) or length(tail) != 1) ->
               {[], ""}
 
             byte == ")" ->
