@@ -18,50 +18,107 @@ defmodule MullItOver do
     end
   end
 
+  defp valid_head?(head), do: Regex.match?(~r/^mul\(\d{1,3}$/, head)
+
+  defp valid_tail?(tail) do
+    case tail do
+      [] ->
+        true
+
+      [""] ->
+        true
+
+      [content] ->
+        cond do
+          Regex.match?(~r/^\d{1,3}$/, content) -> true
+          is_end(String.at(content, -1)) -> true
+          true -> false
+        end
+
+      _ ->
+        false
+    end
+  end
+
+  defp is_end(byte) do
+    byte == ")"
+  end
+
+  defp validate_candidate(candidate) do
+    case candidate do
+      candidate
+      when candidate in [
+             "m",
+             "mu",
+             "mul",
+             "mul(",
+             "d",
+             "do",
+             "do(",
+             "don",
+             "don'",
+             "don't",
+             "don't("
+           ] ->
+        :continue
+
+      "do()" ->
+        :keep
+
+      "don't()" ->
+        :keep
+
+      _ ->
+        if String.length(candidate) > 4 do
+          [head | tail] = String.split(candidate, ",")
+
+          cond do
+            not valid_head?(head) ->
+              :discard
+
+            not valid_tail?(tail) ->
+              :discard
+
+            is_end(String.at(candidate, -1)) ->
+              :keep
+
+            true ->
+              :continue
+          end
+        else
+          :discard
+        end
+    end
+  end
+
   defp extract_factors(path) do
     path
     |> File.stream!([], 1)
     |> Stream.transform("", fn byte, acc ->
       candidate = acc <> byte
-      len = String.length(candidate)
 
-      cond do
-        len == 1 and byte != "m" ->
-          {[], ""}
-
-        len == 2 and byte != "u" ->
-          {[], ""}
-
-        len == 3 and byte != "l" ->
-          {[], ""}
-
-        len == 4 and byte != "(" ->
-          {[], ""}
-
-        len > 4 ->
-          [head | tail] = String.split(candidate, ",")
-
-          cond do
-            not Regex.match?(~r/^mul\(\d{1,3}$/, head) ->
-              {[], ""}
-
-            tail != [] and tail != [""] and
-                ((byte != ")" and
-                    not Regex.match?(~r/^\d{1,3}$/, hd(tail))) or length(tail) != 1) ->
-              {[], ""}
-
-            byte == ")" ->
-              {[candidate], ""}
-
-            true ->
-              {[], candidate}
-          end
-
-        true ->
-          {[], candidate}
+      case validate_candidate(candidate) do
+        :continue -> {[], candidate}
+        :keep -> {[candidate], ""}
+        :discard -> {[], ""}
       end
     end)
+    |> Enum.reduce({"do()", []}, fn x, {mode, muls} ->
+      if x == "do()" or x == "don't()" do
+        {x, muls}
+      else
+        {mode,
+         if mode == "do()" do
+           [x | muls]
+         else
+           muls
+         end}
+      end
+    end)
+    |> elem(1)
     |> Enum.map(&parse_mul/1)
+
+    # |> Enum.map(fn x -> x end)
   end
 
   def run, do: "./input" |> Util.check_path_before_exec(&run/1)
